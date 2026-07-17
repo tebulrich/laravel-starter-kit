@@ -1,0 +1,28 @@
+# Secret scan config for scripts/code-security.sh (Gitleaks).
+# Extends the default rule set; path allowlists skip third-party and local runtime trees.
+
+title = "laravel-starter-kit"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Generated, vendor, and local runtime trees"
+paths = [
+    '''(^|/)vendor/''',
+    '''(^|/)node_modules/''',
+    '''(^|/)\.git/''',
+    '''(^|/)storage/''',
+    '''(^|/)docker/(mysql|pgsql)/data/''',
+    '''(^|/)qa/.+/reports/''',
+    '''(^|/)public/build/''',
+    '''(^|/)public/hot$''',
+    '''(^|/)\.phpunit\.cache/''',
+    '''(^|/)certs/''',
+]
+
+[[allowlists]]
+description = "PHPUnit dummy APP_KEY so tests boot without .env — not a live secret"
+regexes = [
+    '''base64:TeqUiejdukDxUfeRVJL0whMejA3Ut1kn\+lyPSBQ1afI=''',
+]

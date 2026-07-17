@@ -1,0 +1,21 @@
+# Keep GitHub dependency PRs on a weekly cadence. Docker Compose image tags
+# in compose YAML are not a Dependabot ecosystem — bump those with the image
+# refresh notes in README when FrankenPHP / Valkey / Postgres change.
+
+version: 2
+updates:
+  - package-ecosystem: composer
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /docker/php/8.5
+    schedule:
+      interval: weekly

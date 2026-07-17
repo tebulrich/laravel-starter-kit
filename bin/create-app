@@ -1,0 +1,257 @@
+#!/usr/bin/env bash
+# Create a new application from this starter kit with a fresh git history.
+set -euo pipefail
+
+TEMPLATE_REPO="${STARTER_KIT_TEMPLATE:-tebulrich/laravel-starter-kit}"
+TEMPLATE_URL="${STARTER_KIT_GIT_URL:-https://github.com/${TEMPLATE_REPO}.git}"
+CREATE_APP_URL="https://raw.githubusercontent.com/${TEMPLATE_REPO}/main/bin/create-app"
+
+usage() {
+  cat <<EOF
+Create a new app from ${TEMPLATE_REPO} with a fresh git history.
+Does not create a GitHub repository. Does not keep kit commits or origin.
+
+Usage:
+  curl -fsSL ${CREATE_APP_URL} | bash -s -- my-app
+  bin/create-app <path>
+  bin/create-app <name> --github [--public]
+
+One command (git required; the kit does not need to be on disk):
+
+  curl -fsSL ${CREATE_APP_URL} | bash -s -- my-app
+
+Then:
+
+  cd my-app
+  bin/setup
+  ./start.sh
+
+From a kit checkout (no download):
+
+  bin/create-app ~/projects/my-app
+
+GitHub now:
+
+  bin/create-app my-app --github
+
+Publish a local app later:
+
+  gh repo create my-app --private --source=. --remote=origin --push
+EOF
+}
+
+die() {
+  echo "$*" >&2
+  exit 1
+}
+
+destination_is_occupied() {
+  local dest="$1"
+  [[ -e "$dest" ]] || return 1
+  [[ -d "$dest" ]] || return 0
+  [[ -n "$(find "$dest" -mindepth 1 -maxdepth 1 -print -quit)" ]]
+}
+
+resolve_dest() {
+  local raw="$1"
+  if [[ "$raw" == /* ]]; then
+    printf '%s\n' "$raw"
+    return
+  fi
+  printf '%s\n' "$(pwd)/${raw}"
+}
+
+kit_root_from_script() {
+  local src="${BASH_SOURCE[0]:-}"
+  # bash -s / curl|bash: BASH_SOURCE is empty, "-", "main", or a /dev/fd path.
+  [[ -n "$src" ]] || return 1
+  case "$src" in
+    -|main|/dev/*)
+      return 1
+      ;;
+  esac
+  [[ -f "$src" ]] || return 1
+  local dir
+  dir="$(cd "$(dirname "$src")" && pwd)"
+  [[ -f "${dir}/../composer.json" && -f "${dir}/setup" ]] || return 1
+  cd "${dir}/.." && pwd
+}
+
+git_init_fresh() {
+  local dest="$1"
+  git -C "$dest" init -b main >/dev/null
+  git -C "$dest" add -A
+  if git -C "$dest" commit -m "Initial commit" >/dev/null 2>&1; then
+    return 0
+  fi
+  echo "Files are staged. Set git user.name / user.email, then:"
+  echo "  git -C ${dest} commit -m \"Initial commit\""
+}
+
+print_next_steps() {
+  local dest="$1"
+  cat <<EOF
+
+Next:
+  cd ${dest}
+  bin/setup
+  ./start.sh
+EOF
+}
+
+git_in_kit() {
+  local kit="$1"
+  shift
+  GIT_DISCOVERY_ACROSS_FILESYSTEM=1 git -c "safe.directory=*" -C "$kit" "$@"
+}
+
+snapshot_git_worktree() {
+  local kit="$1"
+  local dest="$2"
+  local index tree
+  index="$(mktemp)"
+  rm -f "$index"
+  # Private index: snapshot the worktree (honours gitignore) without staging in the kit.
+  GIT_INDEX_FILE="$index" git_in_kit "$kit" add -A
+  tree="$(GIT_INDEX_FILE="$index" git_in_kit "$kit" write-tree)"
+  git_in_kit "$kit" archive "$tree" | tar -x -C "$dest"
+  rm -f "$index"
+}
+
+snapshot_plain_tree() {
+  local kit="$1"
+  local dest="$2"
+  tar -C "$kit" \
+    --exclude='.git' \
+    --exclude='vendor' \
+    --exclude='node_modules' \
+    --exclude='.env' \
+    --exclude='certs' \
+    --exclude='storage/app/setup-manifest.json' \
+    -cf - . | tar -x -C "$dest"
+}
+
+copy_from_kit() {
+  local kit="$1"
+  local dest="$2"
+  mkdir -p "$dest"
+  if git_in_kit "$kit" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    snapshot_git_worktree "$kit" "$dest"
+  else
+    snapshot_plain_tree "$kit" "$dest"
+  fi
+}
+
+clone_then_strip() {
+  local dest="$1"
+  local url="$TEMPLATE_URL"
+  echo "Fetching ${TEMPLATE_REPO} (snapshot only, no kit history)..."
+  if [[ "$url" == /* ]]; then
+    url="file://${url}"
+  fi
+  git clone --depth 1 --single-branch --quiet "$url" "$dest"
+  rm -rf "${dest}/.git"
+}
+
+create_local() {
+  local dest="$1"
+  local kit_root=""
+
+  command -v git >/dev/null 2>&1 || die "git is required"
+  command -v tar >/dev/null 2>&1 || die "tar is required"
+
+  if destination_is_occupied "$dest"; then
+    die "Refusing to overwrite existing path: ${dest}"
+  fi
+
+  if kit_root="$(kit_root_from_script)"; then
+    copy_from_kit "$kit_root" "$dest"
+  else
+    clone_then_strip "$dest"
+  fi
+
+  git_init_fresh "$dest"
+  echo "Created ${dest} with a fresh git history (no remote)."
+  echo "Later: gh repo create <name> --private --source=. --remote=origin --push"
+  print_next_steps "$dest"
+}
+
+name=""
+github=false
+local_flag=false
+visibility="--private"
+visibility_set=false
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --local)
+      local_flag=true
+      shift
+      ;;
+    --github)
+      github=true
+      shift
+      ;;
+    --public)
+      visibility="--public"
+      visibility_set=true
+      shift
+      ;;
+    --private)
+      visibility="--private"
+      visibility_set=true
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      die "Unknown option: $1"
+      ;;
+    *)
+      if [[ -n "$name" ]]; then
+        die "Unexpected argument: $1"
+      fi
+      name="$1"
+      shift
+      ;;
+  esac
+done
+
+[[ -n "$name" ]] || {
+  usage >&2
+  exit 1
+}
+
+if $github && $local_flag; then
+  die "Use either --github or a local path, not both."
+fi
+
+if $visibility_set && ! $github; then
+  die "${visibility} requires --github. Local apps have no GitHub repository yet."
+fi
+
+if $github; then
+  if [[ "$name" == */* ]]; then
+    die "GitHub repository names cannot be paths. Omit --github to create a local directory."
+  fi
+
+  command -v gh >/dev/null 2>&1 || die "GitHub CLI (gh) is not installed. Create locally instead:
+  bin/create-app ${name}"
+
+  if destination_is_occupied "$(resolve_dest "$name")"; then
+    die "Refusing to overwrite existing path: $(resolve_dest "$name")"
+  fi
+
+  gh repo create "$name" --template "$TEMPLATE_REPO" "$visibility" --clone
+  echo "Created ${name} from template ${TEMPLATE_REPO}."
+  print_next_steps "$name"
+  exit 0
+fi
+
+create_local "$(resolve_dest "$name")"

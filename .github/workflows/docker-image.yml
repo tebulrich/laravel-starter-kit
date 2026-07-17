@@ -1,0 +1,40 @@
+# Optional image build (disabled by default).
+# Enable when GHCR (or another registry) credentials are configured.
+
+name: Docker image
+
+on:
+  workflow_dispatch:
+  # push:
+  #   branches: [main, develop]
+
+jobs:
+  build:
+    name: build-image
+    runs-on: ubuntu-latest
+    if: ${{ false }} # flip to true when registry push is wired
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Assert Docker context
+        run: |
+          chmod +x scripts/ci/assert-docker-context.sh
+          ./scripts/ci/assert-docker-context.sh
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build (no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/php/8.5/Dockerfile
+          push: false
+          build-args: |
+            DOCKER_WWWUSER=www
+            DOCKER_WWWGROUP=www
+            CI_COMMIT_SHA=${{ github.sha }}
+            CI_COMMIT_REF_NAME=${{ github.ref_name }}

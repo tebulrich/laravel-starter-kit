@@ -1,0 +1,4 @@
+# Semgrep rule IDs excluded for this starter (one ID per line).
+# Laravel session cookie domain/secure are env-driven (local HTTP vs production HTTPS).
+php.laravel.security.laravel-cookie-null-domain.laravel-cookie-null-domain
+php.laravel.security.laravel-cookie-secure-set.laravel-cookie-secure-set

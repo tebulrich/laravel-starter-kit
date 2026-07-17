@@ -1,0 +1,65 @@
+# Local Vite for this Vue SPA. Host yarn/Node are not required.
+#
+# Start:  ./start.sh          (detached / daemon)
+# Stop:   ./stop.sh
+# Logs:   docker compose logs -f frontend
+# URL:    https://localhost:{{VITE_PORT}}  (mkcert; not http://127.0.0.1)
+#
+# Joins the Laravel Compose network so Vite can proxy /api to the php service.
+# Start Laravel first (./start.sh in the sibling API repository).
+
+services:
+  frontend:
+    image: node:24-alpine
+    working_dir: /app
+    user: '${DOCKER_UID:-1000}:${DOCKER_GID:-1000}'
+    ports:
+      - '127.0.0.1:${VITE_PORT:-{{VITE_PORT}}}:{{VITE_PORT}}'
+    environment:
+      VITE_PORT: '${VITE_PORT:-{{VITE_PORT}}}'
+      VITE_API_BASE_URL: '${VITE_API_BASE_URL:-}'
+      VITE_CERT_DIR: /app/certs
+      # Reach Laravel on the shared Compose network (not host.docker.internal:
+      # Laravel publishes ports on 127.0.0.1 only).
+      VITE_PROXY_TARGET: '${VITE_DOCKER_PROXY_TARGET:-https://php:443}'
+      COREPACK_HOME: /tmp/corepack
+    volumes:
+      - '.:/app'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    networks:
+      - default
+      - laravel
+    command:
+      - /bin/sh
+      - -lc
+      - |
+        set -euo pipefail
+        SCHEME=http
+        if [ -f /app/certs/localhost.pem ] && [ -f /app/certs/localhost-key.pem ]; then
+          SCHEME=https
+        fi
+        echo ''
+        echo '============================================================'
+        echo '  Vue frontend (Vite)'
+        echo "  Open: $${SCHEME}://localhost:$${VITE_PORT}"
+        if [ "$${SCHEME}" = 'https' ]; then
+          echo '  (mkcert — use localhost, not 127.0.0.1)'
+        else
+          echo '  (HTTP fallback — run ./scripts/create-certificate.sh for HTTPS)'
+        fi
+        echo '  API proxy target: '"$${VITE_PROXY_TARGET}"
+        echo '  Keep Laravel running via ./start.sh in the API repository.'
+        echo '============================================================'
+        echo ''
+        mkdir -p "$${COREPACK_HOME}"
+        if [ ! -f node_modules/.bin/vite ]; then
+          echo 'Installing dependencies with yarn (first run)...'
+          yarn install
+        fi
+        exec yarn dev
+
+networks:
+  laravel:
+    external: true
+    name: '${LARAVEL_DOCKER_NETWORK:-{{COMPOSE_NETWORK}}}'

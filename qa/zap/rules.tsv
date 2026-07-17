@@ -1,0 +1,9 @@
+# ZAP baseline overrides (tab-separated: ruleId, action, comment).
+# Default target is http://php:80/up — framework health HTML, not an SPA shell.
+10017	IGNORE	Cross-domain JS — Laravel health view loads Tailwind from jsDelivr
+10038	IGNORE	CSP Header Not Set — not required on /up health probe
+10049	IGNORE	Non-Storable Content — acceptable for /up health responses
+10063	IGNORE	Permissions-Policy Header Not Set — not required on /up health probe
+10109	IGNORE	Modern Web Application heuristic — informational
+90003	IGNORE	SRI — Laravel health view CDN stylesheet/script
+90004	IGNORE	COEP — not required for Laravel HTML/JSON health

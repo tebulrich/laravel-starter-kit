@@ -1,0 +1,23 @@
+includes:
+    - ../vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 9
+    paths:
+        - ../app/
+        - ../config/
+        - ../database/
+        - ../routes/
+        - ../setup/src/
+
+    excludePaths:
+        - ../bootstrap/
+        - ../storage/
+        - ../vendor/
+        - ../public/
+        - ../resources/views/
+
+    # Fail if an ignore is added and later stops matching. Do not blanket-ignore
+    # undefined properties/methods — Larastan already understands Eloquent.
+    reportUnmatchedIgnoredErrors: true
+    treatPhpDocTypesAsCertain: false

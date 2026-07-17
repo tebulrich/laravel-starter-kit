@@ -1,0 +1,144 @@
+services:
+    # Fail `docker compose up` until bin/setup has written .env + setup-manifest.json.
+    setup-required:
+        image: busybox:1.37.0
+        restart: 'no'
+        network_mode: none
+        read_only: true
+        volumes:
+            - '.:/project:ro'
+        working_dir: /project
+        command: ['/bin/sh', '/project/scripts/require-setup.sh']
+
+    php:
+        build:
+            context: '.'
+            dockerfile: docker/php/8.5/Dockerfile
+            args:
+                DOCKER_WWWUSER: '${DOCKER_WWWUSER:-www}'
+                DOCKER_WWWGROUP: '${DOCKER_WWWGROUP:-www}'
+        restart: unless-stopped
+        image: laravel-starter-kit:8.5
+        extra_hosts:
+            - 'host.docker.internal:host-gateway'
+        cap_add:
+            - NET_ADMIN # FrankenPHP HTTP/3
+        ports:
+            - '127.0.0.1:${APP_PORT_HTTP:-80}:80'
+            - '127.0.0.1:${APP_PORT_HTTPS:-443}:443'
+            - '127.0.0.1:${APP_PORT_HTTPS:-443}:443/udp'
+        environment:
+            DOCKER_WWWUSER: '${DOCKER_WWWUSER:-www}'
+            DOCKER_WWWGROUP: '${DOCKER_WWWGROUP:-www}'
+            IGNITION_LOCAL_SITES_PATH: '${PWD}'
+            PHP_IDE_CONFIG: 'serverName=localhost'
+            COMPOSER_AUTH: '${COMPOSER_AUTH:-}'
+            COMPOSER_HOME: /tmp/composer
+            OCTANE_WORKERS: '${OCTANE_WORKERS:-4}'
+            PUBLIC_HTTPS_PORT: '${APP_PORT_HTTPS:-443}'
+        volumes:
+            - '.:/var/www/html'
+            - './docker/configs/laravel-log-rotate:/etc/logrotate.d/laravel-log-rotate'
+            # Local overrides: watch mode. Image bake uses docker/configs/supervisor/worker-frankenphp.conf (no watch).
+            - './docker/configs/supervisor/local/worker-frankenphp.conf:/etc/supervisor/conf.d/worker-frankenphp.conf'
+            - './docker/configs/supervisor/worker-laravel-cron.conf:/etc/supervisor/conf.d/worker-laravel-cron.conf'
+            - './docker/configs/supervisor/worker-laravel-queue.conf:/etc/supervisor/conf.d/worker-laravel-queue.conf'
+            - './docker/configs/supervisor/task-artisan-migrate.conf:/etc/supervisor/conf.d/task-artisan-migrate.conf'
+            - './docker/configs/supervisor/task-composer.conf:/etc/supervisor/conf.d/task-composer.conf'
+            - './docker/configs/supervisord.conf:/etc/supervisor/supervisord.conf'
+            - './docker/Caddyfile.local:/etc/caddy/Caddyfile'
+            - './certs:/certs:ro'
+            - 'caddy_data:/data/caddy'
+        networks:
+            - app
+        depends_on:
+            setup-required:
+                condition: service_completed_successfully
+            redis:
+                condition: service_started
+            mysql:
+                condition: service_healthy
+                required: false
+            pgsql:
+                condition: service_healthy
+                required: false
+
+    mysql:
+        profiles: ['mysql']
+        image: mysql:8.4
+        restart: unless-stopped
+        ports:
+            - '127.0.0.1:${FORWARD_DB_PORT:-3306}:3306'
+        environment:
+            MYSQL_ROOT_PASSWORD: '${DB_PASSWORD:-password}'
+            MYSQL_DATABASE: '${DB_DATABASE:-laravel}'
+            MYSQL_USER: '${DB_USERNAME:-laravel}'
+            MYSQL_PASSWORD: '${DB_PASSWORD:-password}'
+        volumes:
+            - './docker/mysql/data:/var/lib/mysql'
+        networks:
+            - app
+        depends_on:
+            setup-required:
+                condition: service_completed_successfully
+        healthcheck:
+            test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-uroot', '-p${DB_PASSWORD:-password}']
+            interval: 5s
+            timeout: 5s
+            retries: 20
+
+    pgsql:
+        profiles: ['pgsql']
+        image: postgres:18-alpine
+        restart: unless-stopped
+        ports:
+            - '127.0.0.1:${FORWARD_DB_PORT:-5432}:5432'
+        environment:
+            POSTGRES_DB: '${DB_DATABASE:-laravel}'
+            POSTGRES_USER: '${DB_USERNAME:-laravel}'
+            POSTGRES_PASSWORD: '${DB_PASSWORD:-password}'
+        volumes:
+            - './docker/pgsql/data:/var/lib/postgresql'
+        networks:
+            - app
+        depends_on:
+            setup-required:
+                condition: service_completed_successfully
+        healthcheck:
+            test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+            interval: 5s
+            timeout: 5s
+            retries: 20
+
+    redis:
+        image: valkey/valkey:9.1-alpine
+        restart: unless-stopped
+        ports:
+            - '127.0.0.1:${FORWARD_REDIS_PORT:-6379}:6379'
+        volumes:
+            - redis_data:/data
+        networks:
+            - app
+        depends_on:
+            setup-required:
+                condition: service_completed_successfully
+
+    mailpit:
+        image: axllent/mailpit:v1.30.7
+        restart: unless-stopped
+        ports:
+            - '127.0.0.1:${FORWARD_MAILPIT_UI_PORT:-8025}:8025'
+            - '127.0.0.1:${FORWARD_MAILPIT_SMTP_PORT:-1025}:1025'
+        networks:
+            - app
+        depends_on:
+            setup-required:
+                condition: service_completed_successfully
+
+networks:
+    app:
+        driver: bridge
+
+volumes:
+    caddy_data:
+    redis_data:

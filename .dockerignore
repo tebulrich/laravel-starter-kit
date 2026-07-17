@@ -1,0 +1,76 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Node.js
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE and editor files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage
+.phpunit.result.cache
+.phpunit.cache
+.php-cs-fixer.cache
+
+# Documentation (keep README for image metadata consumers if needed)
+*.md
+!README.md
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+supervisor.sock
+
+# Build artifacts
+dist
+build
+
+# Compose / ignore files (avoid recursion noise in context)
+docker-compose*.yml
+compose*.yaml
+.dockerignore
+
+# Database files
+*.sqlite
+*.db
+
+# MySQL / PostgreSQL runtime data
+docker/mysql/data
+docker/mysql/logs
+docker/pgsql/data
+docker/pgsql/logs
+
+# App runtime contents (never bake logs/cache/sessions into the image).
+# The Dockerfile recreates the empty Laravel storage directory tree after COPY
+# so feature instances (no storage PVC) can still boot.
+# Do NOT ignore vendor: CI installs it and Kaniko must COPY it into the image.
+# Do NOT ignore bootstrap/cache: Laravel requires that directory at runtime.
+storage
+
+# Security scan reports (generated locally / in CI)
+qa/semgrep/reports
+qa/zap/reports
+qa/sbom/reports
+qa/trivy/reports
+
+.env
+.env.*
+!.env.example
+certs/
+!certs/.gitkeep
+auth.json

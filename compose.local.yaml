@@ -1,0 +1,30 @@
+services:
+  xdebug:
+    image: thecodingmachine/php:8.5-v5-apache-node24
+    ports:
+      - '127.0.0.1:${APP_PORT_XDEBUG:-8081}:80'
+    working_dir: /var/www/html
+    restart: unless-stopped
+    volumes:
+      - ./:/var/www/html
+    environment:
+      APACHE_DOCUMENT_ROOT: public/
+      PHP_EXTENSION_XDEBUG: '1'
+      PHP_EXTENSION_MYSQL: '1'
+      PHP_INI_MEMORY_LIMIT: 512M
+      PHP_INI_MAX_EXECUTION_TIME: 120
+      PHP_INI_XDEBUG__MODE: debug,develop
+      PHP_INI_XDEBUG__START_WITH_REQUEST: yes
+      PHP_INI_OPCACHE__JIT: '0'
+      PHP_INI_OPCACHE__JIT_BUFFER_SIZE: '0'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    networks:
+      - app
+    depends_on:
+      setup-required:
+        condition: service_completed_successfully
+
+networks:
+  app:
+    driver: bridge

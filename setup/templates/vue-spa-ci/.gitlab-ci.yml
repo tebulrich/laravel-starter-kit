@@ -1,0 +1,23 @@
+# Frontend pipeline for the separate Vue SPA repository.
+
+stages:
+  - qa
+
+frontend-qa:
+  stage: qa
+  image: node:24-alpine
+  cache:
+    key:
+      files:
+        - yarn.lock
+    paths:
+      - node_modules/
+  before_script:
+    - corepack enable
+  script:
+    - yarn install --frozen-lockfile
+    - yarn qa
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "web"

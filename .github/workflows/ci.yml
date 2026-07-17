@@ -1,0 +1,222 @@
+# Mirrors .gitlab-ci.yml quality gate for GitHub-hosted repos.
+# Optional GitLab deploy helpers live in .gitlab-ci-common.yml.
+#
+# Note: jobs use `container:` (FrankenPHP Alpine). Local composite actions
+# (`uses: ./…`) fail in that mode — PHP prep is scripts/ci/php-quality-setup.sh.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  COMPOSER_NO_INTERACTION: "1"
+
+jobs:
+  install-dependencies:
+    name: install-dependencies
+    runs-on: ubuntu-latest
+    container:
+      image: dunglas/frankenphp:1.12.7-php8.5-alpine
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: PHP quality setup
+        run: |
+          chmod +x scripts/ci/php-quality-setup.sh
+          ./scripts/ci/php-quality-setup.sh
+
+      - name: Install Composer
+        run: |
+          curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
+      - name: Composer install
+        run: composer install --prefer-dist --optimize-autoloader
+
+      - name: Assert Docker context
+        run: |
+          chmod +x scripts/ci/assert-docker-context.sh
+          ./scripts/ci/assert-docker-context.sh
+
+      - name: Upload vendor
+        uses: actions/upload-artifact@v7
+        with:
+          name: vendor
+          path: vendor/
+          retention-days: 1
+
+  laravel-pint:
+    name: laravel-pint
+    needs: install-dependencies
+    runs-on: ubuntu-latest
+    container:
+      image: dunglas/frankenphp:1.12.7-php8.5-alpine
+    steps:
+      - uses: actions/checkout@v7
+      - run: chmod +x scripts/ci/php-quality-setup.sh && ./scripts/ci/php-quality-setup.sh
+      - uses: actions/download-artifact@v8
+        with:
+          name: vendor
+          path: vendor
+      # upload-artifact does not reliably preserve +x on vendor/bin/*
+      - run: chmod +x vendor/bin/* scripts/pint.sh && ./scripts/pint.sh --dry-run
+
+  laravel-rector:
+    name: laravel-rector
+    needs: install-dependencies
+    runs-on: ubuntu-latest
+    container:
+      image: dunglas/frankenphp:1.12.7-php8.5-alpine
+    steps:
+      - uses: actions/checkout@v7
+      - run: chmod +x scripts/ci/php-quality-setup.sh && ./scripts/ci/php-quality-setup.sh
+      - uses: actions/download-artifact@v8
+        with:
+          name: vendor
+          path: vendor
+      - run: chmod +x vendor/bin/* scripts/rector.sh && ./scripts/rector.sh --dry-run
+
+  laravel-phpstan:
+    name: laravel-phpstan
+    needs: install-dependencies
+    runs-on: ubuntu-latest
+    container:
+      image: dunglas/frankenphp:1.12.7-php8.5-alpine
+    steps:
+      - uses: actions/checkout@v7
+      - run: chmod +x scripts/ci/php-quality-setup.sh && ./scripts/ci/php-quality-setup.sh
+      - uses: actions/download-artifact@v8
+        with:
+          name: vendor
+          path: vendor
+      - run: chmod +x vendor/bin/* scripts/phpstan.sh && ./scripts/phpstan.sh --dry-run
+
+  laravel-pest:
+    name: laravel-pest
+    needs: install-dependencies
+    runs-on: ubuntu-latest
+    container:
+      image: dunglas/frankenphp:1.12.7-php8.5-alpine
+    steps:
+      - uses: actions/checkout@v7
+      - run: chmod +x scripts/ci/php-quality-setup.sh && ./scripts/ci/php-quality-setup.sh
+      - uses: actions/download-artifact@v8
+        with:
+          name: vendor
+          path: vendor
+      - run: chmod +x vendor/bin/* scripts/phpunit.sh && ./scripts/phpunit.sh
+
+  scripts-qa:
+    name: scripts-qa
+    runs-on: ubuntu-latest
+    container:
+      image: dunglas/frankenphp:1.12.7-php8.5-alpine
+    steps:
+      # git must exist before checkout; otherwise the action fetches a tarball with no .git
+      # and create-app cannot snapshot the kit.
+      - run: apk add --no-cache bash git tar
+      - uses: actions/checkout@v7
+      - run: chmod +x scripts/tests/*.test.sh && ./scripts/tests/code-security-runtime.test.sh && ./scripts/tests/require-setup.test.sh && ./scripts/tests/create-app.test.sh
+
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: ShellCheck scripts
+        run: |
+          mapfile -t scripts < <(find scripts docker/php -name '*.sh' | sort)
+          scripts+=(start.sh stop.sh bin/setup bin/create-app)
+          docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:stable -S warning "${scripts[@]}"
+
+  code-security:
+    name: code-security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.5"
+          tools: composer:v2
+          coverage: none
+
+      - name: Code security check (SAST + secrets + SCA)
+        run: |
+          chmod +x scripts/code-security.sh
+          ./scripts/code-security.sh check
+
+      - name: Generate SBOM (Syft CycloneDX + SPDX)
+        run: ./scripts/code-security.sh sbom
+
+      - name: Trivy filesystem CVE scan
+        run: ./scripts/code-security.sh image-scan
+
+      - name: Upload Semgrep SARIF
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: semgrep-sarif
+          path: qa/semgrep/reports/semgrep.sarif
+          if-no-files-found: ignore
+
+      - name: Upload Gitleaks report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gitleaks
+          path: qa/gitleaks/reports/
+          if-no-files-found: ignore
+
+      - name: Upload SBOM artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom
+          path: qa/sbom/reports/
+          if-no-files-found: ignore
+
+      - name: Upload Trivy reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-fs
+          path: qa/trivy/reports/
+          if-no-files-found: ignore
+
+  frontend-qa:
+    name: frontend-qa
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Detect in-repo frontend
+        id: frontend
+        run: |
+          if [ -f frontend/package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No frontend/package.json — skipping yarn QA (Vue separate lives in a sibling repo)."
+          fi
+      - if: steps.frontend.outputs.present == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+      - if: steps.frontend.outputs.present == 'true'
+        working-directory: frontend
+        run: |
+          corepack enable
+          yarn install --frozen-lockfile
+          yarn qa

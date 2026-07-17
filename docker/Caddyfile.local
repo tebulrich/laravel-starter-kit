@@ -1,0 +1,68 @@
+{
+	auto_https off
+	admin off
+
+	frankenphp {
+		worker {
+			file /var/www/html/public/frankenphp-worker.php
+			watch /var/www/html/app
+			watch /var/www/html/config
+			watch /var/www/html/routes
+			watch /var/www/html/resources
+			watch /var/www/html/public
+		}
+	}
+}
+
+# HTTP → HTTPS. PUBLIC_HTTPS_PORT is substituted at load time (443 = omit port in URL).
+:80 {
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-X-Powered-By
+	}
+	@non_standard_port expression {env.PUBLIC_HTTPS_PORT} != "443"
+	handle @non_standard_port {
+		redir https://{host}:{env.PUBLIC_HTTPS_PORT}{uri} permanent
+	}
+	handle {
+		redir https://{host}{uri} permanent
+	}
+}
+
+:443 {
+	tls /certs/localhost.pem /certs/localhost-key.pem
+
+	log {
+		level INFO
+		format filter {
+			wrap console
+			fields {
+				uri query {
+					replace authorization REDACTED
+				}
+			}
+		}
+	}
+
+	@non_standard_port expression {env.PUBLIC_HTTPS_PORT} != "443"
+	header @non_standard_port >Alt-Svc "h3=\":{env.PUBLIC_HTTPS_PORT}\"; ma=2592000,h3-29=\":{env.PUBLIC_HTTPS_PORT}\"; ma=2592000"
+
+	route {
+		header {
+			X-Content-Type-Options nosniff
+			X-Frame-Options DENY
+			Referrer-Policy strict-origin-when-cross-origin
+			-X-Powered-By
+			defer
+		}
+		root * "/var/www/html/public"
+		encode zstd br gzip
+		{$CADDY_SERVER_EXTRA_DIRECTIVES}
+		php_server {
+			index frankenphp-worker.php
+			resolve_root_symlink
+		}
+	}
+}
