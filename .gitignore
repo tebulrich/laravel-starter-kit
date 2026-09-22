@@ -19,7 +19,6 @@ yarn-error.log
 /.vscode
 /.zed
 /bolt.db
-/storage/app/setup-manifest.json
 /storage/debugbar
 /docker/mysql/data
 /docker/pgsql/data
