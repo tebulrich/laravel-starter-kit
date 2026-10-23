@@ -199,7 +199,7 @@ Optional foreground attach: `./start.sh --foreground`.
 
 | Component | Choice |
 |-----------|--------|
-| Runtime | `dunglas/frankenphp:1.12.7-php8.5-alpine` + Laravel Octane (+ Node/yarn in the image for frontend installs) |
+| Runtime | `dunglas/frankenphp:1.13.2-php8.5.12-alpine` + Laravel Octane (+ Node/yarn in the image for frontend installs) |
 | Local TLS | mkcert + Caddy (`https://localhost`; see [Local HTTPS](#local-https)) |
 | Process manager | Supervisor (FrankenPHP, Redis queue, scheduler, migrate + Passport keys) |
 | Frontend (Vue) | Sibling or `frontend/` Compose service (`./start.sh` → Vite HTTPS) |

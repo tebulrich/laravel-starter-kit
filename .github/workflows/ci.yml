@@ -26,7 +26,7 @@ jobs:
     name: install-dependencies
     runs-on: ubuntu-latest
     container:
-      image: dunglas/frankenphp:1.12.7-php8.5-alpine
+      image: dunglas/frankenphp:1.13.2-php8.5.12-alpine
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -60,7 +60,7 @@ jobs:
     needs: install-dependencies
     runs-on: ubuntu-latest
     container:
-      image: dunglas/frankenphp:1.12.7-php8.5-alpine
+      image: dunglas/frankenphp:1.13.2-php8.5.12-alpine
     steps:
       - uses: actions/checkout@v7
       - run: chmod +x scripts/ci/php-quality-setup.sh && ./scripts/ci/php-quality-setup.sh
@@ -76,7 +76,7 @@ jobs:
     needs: install-dependencies
     runs-on: ubuntu-latest
     container:
-      image: dunglas/frankenphp:1.12.7-php8.5-alpine
+      image: dunglas/frankenphp:1.13.2-php8.5.12-alpine
     steps:
       - uses: actions/checkout@v7
       - run: chmod +x scripts/ci/php-quality-setup.sh && ./scripts/ci/php-quality-setup.sh
@@ -91,7 +91,7 @@ jobs:
     needs: install-dependencies
     runs-on: ubuntu-latest
     container:
-      image: dunglas/frankenphp:1.12.7-php8.5-alpine
+      image: dunglas/frankenphp:1.13.2-php8.5.12-alpine
     steps:
       - uses: actions/checkout@v7
       - run: chmod +x scripts/ci/php-quality-setup.sh && ./scripts/ci/php-quality-setup.sh
@@ -106,7 +106,7 @@ jobs:
     needs: install-dependencies
     runs-on: ubuntu-latest
     container:
-      image: dunglas/frankenphp:1.12.7-php8.5-alpine
+      image: dunglas/frankenphp:1.13.2-php8.5.12-alpine
     steps:
       - uses: actions/checkout@v7
       - run: chmod +x scripts/ci/php-quality-setup.sh && ./scripts/ci/php-quality-setup.sh
@@ -120,7 +120,7 @@ jobs:
     name: scripts-qa
     runs-on: ubuntu-latest
     container:
-      image: dunglas/frankenphp:1.12.7-php8.5-alpine
+      image: dunglas/frankenphp:1.13.2-php8.5.12-alpine
     steps:
       # git must exist before checkout; otherwise the action fetches a tarball with no .git
       # and create-app cannot snapshot the kit.

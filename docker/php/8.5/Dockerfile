@@ -1,4 +1,4 @@
-FROM dunglas/frankenphp:1.12.7-php8.5-alpine
+FROM dunglas/frankenphp:1.13.2-php8.5.12-alpine
 
 ARG DOCKER_WWWGROUP=www
 ARG DOCKER_WWWUSER=www

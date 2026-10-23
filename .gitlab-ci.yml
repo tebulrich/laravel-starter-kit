@@ -54,7 +54,7 @@ stages:
     - *clone_ci_common
 
 .php_base: &php_base
-  image: dunglas/frankenphp:1.12.7-php8.5-alpine
+  image: dunglas/frankenphp:1.13.2-php8.5.12-alpine
 
 .php_system_packages: &php_system_packages
   - apk add --no-cache git curl bash unzip icu-dev libzip-dev oniguruma-dev $PHPIZE_DEPS
@@ -179,7 +179,7 @@ shellcheck:
 # Semgrep / Syft / Trivy need Docker. DinD + FrankenPHP host for Composer SCA.
 code-security:
   stage: code-quality
-  image: dunglas/frankenphp:1.12.7-php8.5-alpine
+  image: dunglas/frankenphp:1.13.2-php8.5.12-alpine
   services:
     - name: docker:27-dind
       command: ["--tls=false"]
