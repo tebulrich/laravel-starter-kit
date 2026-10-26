@@ -108,7 +108,8 @@
         "test:scripts": [
             "./scripts/tests/code-security-runtime.test.sh",
             "./scripts/tests/require-setup.test.sh",
-            "./scripts/tests/create-app.test.sh"
+            "./scripts/tests/create-app.test.sh",
+            "./scripts/tests/code-quality-dry-run.test.sh"
         ],
         "test:wizard-matrix": [
             "@php vendor/bin/pest -c qa/phpunit.xml --group wizard-matrix"

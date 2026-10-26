@@ -98,6 +98,11 @@ final class SetupApplierTest extends TestCase
         $this->assertFileExists($this->workspace . '/frontend/package.json');
         $this->assertFileExists($this->workspace . '/frontend/src/App.vue');
 
+        // Pint aligns the arrows of an array; the generated file must already match or the quality check fails.
+        $starter = (string) file_get_contents($this->workspace . '/config/starter.php');
+        $this->assertStringContainsString("'sample_api'      => (bool) env(", $starter);
+        $this->assertStringContainsString("'frontend_layout' => (string) env(", $starter);
+
         $manifest = json_decode((string) file_get_contents($this->workspace . '/storage/app/setup-manifest.json'), true);
         $this->assertIsArray($manifest);
         $this->assertSame('monolith', $manifest['plan']['layout']);

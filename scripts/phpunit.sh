@@ -3,9 +3,10 @@ set -euo pipefail
 
 for arg in "$@"; do
     case $arg in
+        --dry-run) ;; # accepted so code-quality.sh can pass it to every script; tests always execute
         --help|-h)
-            echo "Usage: ./scripts/phpunit.sh"
-            echo "Runs Pest (qa/phpunit.xml). There is no --dry-run; tests always execute."
+            echo "Usage: ./scripts/phpunit.sh [--dry-run]"
+            echo "Runs Pest (qa/phpunit.xml). --dry-run is accepted and changes nothing: tests always execute."
             exit 0
             ;;
         *) echo "Unknown option: $arg" >&2 ; exit 1 ;;

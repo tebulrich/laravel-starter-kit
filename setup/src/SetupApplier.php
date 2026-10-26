@@ -158,10 +158,10 @@ declare(strict_types=1);
  */
 return [
     'features' => [
-        'sample_api' => (bool) env('STARTER_SAMPLE_API', {$sample}),
-        'sentry' => (bool) env('STARTER_FEATURE_SENTRY', {$sentry}),
-        'passport' => (bool) env('STARTER_FEATURE_PASSPORT', {$passport}),
-        'authentik' => (bool) env('STARTER_FEATURE_AUTHENTIK', {$authentik}),
+        'sample_api'      => (bool) env('STARTER_SAMPLE_API', {$sample}),
+        'sentry'          => (bool) env('STARTER_FEATURE_SENTRY', {$sentry}),
+        'passport'        => (bool) env('STARTER_FEATURE_PASSPORT', {$passport}),
+        'authentik'       => (bool) env('STARTER_FEATURE_AUTHENTIK', {$authentik}),
         'frontend_layout' => (string) env('STARTER_FRONTEND_LAYOUT', {$layout}),
     ],
 ];
